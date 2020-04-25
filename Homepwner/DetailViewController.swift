@@ -11,10 +11,16 @@ import UIKit
 
 class DetailViewController: UIViewController, UITextFieldDelegate {
     
-    @IBOutlet var nameField: UITextField!
-    @IBOutlet var serialNumberField: UITextField!
-    @IBOutlet var valueField: UITextField!
+   
+    @IBOutlet var winnerField: UITextField!
+    @IBOutlet var scoreField: UITextField!
+    @IBOutlet var mvpField: UITextField!
+    @IBOutlet var loserField: UITextField!
+    @IBOutlet var locationField: UITextField!
     @IBOutlet var dateLabel: UILabel!
+    
+    var itemStore: ItemStore!
+    var itemsView: ItemsViewController!
     
     
    @IBAction func backgroundTapped(_ sender: UITapGestureRecognizer) {
@@ -22,65 +28,66 @@ class DetailViewController: UIViewController, UITextFieldDelegate {
       }
     
     
-    @IBAction func deleteItem(_ sender: UIBarButtonItem) {
-    }
-    
-    
-    
     var item: Item! {
         didSet{
-            navigationItem.title = item.name
+            //navigationItem.title = item.winner
+            navigationItem.title = "Superbowl \(item.sb ?? "")"
         }
     }
     
-    let numberFormatter: NumberFormatter = {
+    
+    @IBAction func deleteItem(_ sender: UIBarButtonItem) {
         
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        formatter.minimumFractionDigits = 2
-        formatter.maximumFractionDigits = 2
-        return formatter
-    }()
-    
-    let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .none
-        return formatter
-    }()
-    
+        let title = "Delete Superbowl \(item.sb ?? "")?"
+        let message = "Are you sure you want to delete this item?"
+        let ac = UIAlertController(title: title, message: message, preferredStyle: .actionSheet)
+        
+        let cancelAction = UIAlertAction(title: "Cancel", style: .cancel, handler: nil)
+        ac.addAction(cancelAction)
+        
+        let deleteAction = UIAlertAction(title: "Delete", style: .destructive, handler: { (action) -> Void in
+            
+            self.itemsView.itemDataSource.removeItem(self.item)
+            _ = self.navigationController?.popViewController(animated: true)
+            
+        })
+        
+        ac.addAction(deleteAction)
+        
+        present(ac, animated: true, completion: nil)
+    }
     
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         
-        nameField.text = item.name
-        serialNumberField.text = item.serialNumber
-        valueField.text = numberFormatter.string(from: NSNumber(value: item.valueInDollars))
-        dateLabel.text = dateFormatter.string(from: item.dateCreated)
+        self.winnerField.text = item.winner
+        self.scoreField.text = item.score
+        self.mvpField.text = item.mvp
+        self.loserField.text = item.loser
+        self.locationField.text = item.location
+        self.dateLabel.text = item.date
+        
     }
+    
     
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         
         view.endEditing(true)
         
-        item.name = nameField.text ?? ""
-        item.serialNumber = serialNumberField.text
+        item.winner = winnerField.text ?? ""
+        item.score = scoreField.text
+        item.mvp = mvpField.text ?? ""
+        item.loser = loserField.text ?? ""
+        item.location = locationField.text ?? ""
         
-        if let valueText = valueField.text,
-            let value = numberFormatter.number(from: valueText) {
-            item.valueInDollars = value.intValue
-        } else {
-            item.valueInDollars = 0
-        }
     }
+    
     
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
         textField.resignFirstResponder()
         return true
     }
-    
-    
     
 }

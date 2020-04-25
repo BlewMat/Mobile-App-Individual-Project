@@ -8,64 +8,69 @@
 
 import UIKit
 
-class ItemsViewController: UITableViewController {
+class ItemsViewController: UIViewController, UITableViewDelegate {
     
-    var itemStore: ItemStore!
+    @IBOutlet var tableviews: UITableView!
+    @IBOutlet var editButton: UIBarButtonItem!
     
-    override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int{
-        return itemStore.allItems.count
-    }
+    var store: ItemStore!
+    let itemDataSource = ItemDataSource()
     
-    override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        //let cell = UITableViewCell(style: .value1, reuseIdentifier: "UITableViewCell")
-        
-        //let cell = tableView.dequeueReusableCell(withIdentifier: "UITableViewCell", for: indexPath)
-        let cell = tableView.dequeueReusableCell(withIdentifier: "ItemCell", for: indexPath) as! ItemCell
-        
-        let item = itemStore.allItems[indexPath.row]
-        
-        //cell.textLabel?.text = item.name
-        //cell.detailTextLabel?.text = "$\(item.valueInDollars)"
-        cell.nameLabel.text = item.name
-        cell.serialNumberLabel.text = item.serialNumber
-        cell.valueLabel.text = "$\(item.valueInDollars)"
-        
-        
-        return cell
-    }
     
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        let statusBarHeight = UIApplication.shared.statusBarFrame.height
-        
-        //tableView.rowHeight = UITableView.automaticDimension
-        //tableView.estimatedRowHeight = 65
-        tableView.rowHeight = 65
+        tableviews.dataSource = itemDataSource
+        tableviews.delegate = self
+               
+        updateDataSource()
+               
+               store.fetchItems {
+                   (ItemsResult) -> Void in
+                   
+                   self.updateDataSource()
+               }
+               
+               tableviews.rowHeight = 65
+    
     }
     
+    
     @IBAction func addNewItem(_ sender: UIBarButtonItem){
-        //let lastRow = tableView.numberOfRows(inSection: 0)
-        //let indexPath = IndexPath(row:lastRow, section: 0)
         
-        //tableView.insertRows(at: [indexPath], with: .automatic)
+        itemDataSource.createItem(into: store.persistentContainer.viewContext)
+       
+        tableviews.reloadData()
+    }
+    
+    
+    private func tableView(_ tableView: UITableView, willDisplay cell: UITableViewCell, forItemAt indexPath: IndexPath) {
         
-        let newItem = itemStore.createItem()
+        let item = itemDataSource.items[indexPath.row]
         
-        if let index = itemStore.allItems.index(of: newItem) {
-            let indexPath = IndexPath(row: index, section: 0)
+        store.fetchSuperbowl(for: item) { (result) -> Void in
             
-            tableView.insertRows(at: [indexPath], with: .automatic)
+            guard let itemIndex = self.itemDataSource.items.firstIndex(of: item),
+                case let .success(Superbowl) = result else {
+                    return
+            }
+            
+            let itemIndexPath = IndexPath(item: itemIndex, section: 0)
+                
+            if let cell = self.tableviews.cellForRow(at: itemIndexPath) as? ItemCell {
+                
+                cell.update(with: item)
+        }
         }
     }
     
     
-    override func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
+    func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
         
-        if editingStyle == .delete {
-            let item = itemStore.allItems[indexPath.row]
+        if  editingStyle == .delete {
+            let item = itemDataSource.items[indexPath.row]
             
-            let title = "Delete \(item.name)?"
+            let title = "Delete Superbowl \(item.sb ?? "")?"
             let message = "Are you sure you want to delete this item?"
             let ac = UIAlertController(title: title, message: message, preferredStyle: .actionSheet)
             
@@ -74,9 +79,9 @@ class ItemsViewController: UITableViewController {
             
             let deleteAction = UIAlertAction(title: "Delete", style: .destructive, handler: { (action) -> Void in
                 
-                self.itemStore.removeItem(item)
+                self.itemDataSource.removeItem(item)
                 
-                self.tableView.deleteRows(at: [indexPath], with: .automatic)
+                self.tableviews.deleteRows(at: [indexPath], with: .automatic)
                 
             })
             
@@ -87,19 +92,21 @@ class ItemsViewController: UITableViewController {
         
     }
     
-    override func tableView(_ tableView: UITableView, moveRowAt sourceIndexPath: IndexPath, to destinationIndexPath: IndexPath){
+    
+    func tableView(_ tableView: UITableView, moveRowAt sourceIndexPath: IndexPath, to destinationIndexPath: IndexPath){
         
-        itemStore.moveItem(from: sourceIndexPath.row, to: destinationIndexPath.row)
+        itemDataSource.moveItem(from: sourceIndexPath.row, to: destinationIndexPath.row)
     }
     
     
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
         switch segue.identifier {
         case "showItem"?:
-            if let row = tableView.indexPathForSelectedRow?.row {
-                let item = itemStore.allItems[row]
+            if let row = tableviews.indexPathForSelectedRow?.row {
+                let item = itemDataSource.items[row]
                 let detailViewController = segue.destination as! DetailViewController
                 detailViewController.item = item
+                detailViewController.itemsView = self
             }
         default:
             preconditionFailure("Unexpected segue identifier.")
@@ -110,13 +117,67 @@ class ItemsViewController: UITableViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         
-        tableView.reloadData()
+        tableviews.reloadData()
     }
     
+    
+    private func updateDataSource() {
+        store.fetchAllItems {
+            (ItemsResult) in
+            
+            switch ItemsResult {
+            case let .success(items):
+                self.itemDataSource.items = items
+            case .failure:
+                self.itemDataSource.items.removeAll()
+            }
+            self.tableviews.reloadSections(IndexSet(integer:0), with: .automatic)
+        }
+    }
+    
+    
+    @IBAction func reloadData() {
+        
+        self.itemDataSource.items.removeAll()
+        tableviews.reloadData()
+        store.persistentContainer.viewContext.reset()
+        
+        store.fetchItems {
+            (ItemsResult) -> Void in
+            
+            self.updateDataSource()
+        }
+    }
+    
+    
+    
+    
+    //EDIT BUTTON DOES NOT WORK
     required init?(coder aDecoder: NSCoder) {
         super.init(coder: aDecoder)
         
-        navigationItem.leftBarButtonItem = editButtonItem
+        self.navigationItem.leftBarButtonItem = self.editButtonItem
     }
     
+    /*
+    @IBAction func editBtnPressed(_ sender: UIBarButtonItem) {
+        
+        tableviews.setEditing(!tableviews.isEditing, animated: true)
+        
+        if tableviews.isEditing {
+            self.editButton.title = "Done"
+            
+            print("Editing")
+            
+            //tableviews.setEditing(false, animated: true)
+        } else {
+            self.editButton.title = "Edit"
+            
+            print("Done")
+            
+            //tableviews.setEditing(true, animated: true)
+        }
+      
+    }
+    */
 }

@@ -11,17 +11,33 @@ import UIKit
 
 class ItemCell: UITableViewCell {
     
-    @IBOutlet var nameLabel: UILabel!
-    @IBOutlet var serialNumberLabel: UILabel!
-    @IBOutlet var valueLabel: UILabel!
+    @IBOutlet var winnerLabel: UILabel!
+    @IBOutlet var scoreLabel: UILabel!
+    @IBOutlet var sbLabel: UILabel!
+    
+    
+    func update(with item: Item?){
+    
+    winnerLabel.text = item?.winner
+    scoreLabel.text = item?.score
+    sbLabel.text = item?.sb
+    }
     
     
     override func awakeFromNib() {
         super.awakeFromNib()
         
-        nameLabel.adjustsFontForContentSizeCategory = true
-        serialNumberLabel.adjustsFontForContentSizeCategory = true
-        valueLabel.adjustsFontForContentSizeCategory = true
+        winnerLabel.adjustsFontForContentSizeCategory = true
+        scoreLabel.adjustsFontForContentSizeCategory = true
+        sbLabel.adjustsFontForContentSizeCategory = true
+        
+        update(with: nil)
     }
     
+    
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        
+        update(with: nil)
+    }
 }
